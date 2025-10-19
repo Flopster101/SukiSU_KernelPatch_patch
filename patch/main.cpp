@@ -92,12 +92,12 @@ int main() try {
     check_file_exists("Image");
 
     #ifdef __aarch64__
-        std::vector<uint8_t> kptools_data(res_kptools_android, res_kptools_android + res_kptools_android_len);
+        std::vector<uint8_t> kptools_data(kptools_android, kptools_android + kptools_android_len);
     #else
-        std::vector<uint8_t> kptools_data(res_kptools_linux, res_kptools_linux + res_kptools_linux_len);
+        std::vector<uint8_t> kptools_data(kptools_linux, kptools_linux + kptools_linux_len);
     #endif
 
-    std::vector<uint8_t> kpimg_data(res_kpimg_enc, res_kpimg_enc + res_kpimg_enc_len);
+    std::vector<uint8_t> kpimg_data(kpimg_enc, kpimg_enc + kpimg_enc_len);
     decrypt_kpimg(kpimg_data);
     int kpimg_mem_fd = create_memfd(kpimg_data); 
     std::string kpimg_path = fd_to_path(kpimg_mem_fd); 

@@ -27,36 +27,34 @@ if(NOT ANDROID)
     # 生成头文件的自定义命令
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/include/kpimg_enc.h
-        COMMAND xxd -i ${CMAKE_CURRENT_BINARY_DIR}/res/kpimg.enc 
-                > ${CMAKE_CURRENT_BINARY_DIR}/include/kpimg_enc.h
+        COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/res && xxd -i kpimg.enc > ../include/kpimg_enc.h
         DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/res/kpimg.enc
     )
 
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/include/kptools_linux.h
-        COMMAND xxd -i ${CMAKE_CURRENT_SOURCE_DIR}/res/kptools-linux 
-                > ${CMAKE_CURRENT_BINARY_DIR}/include/kptools_linux.h
+        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/res && xxd -i kptools-linux > ${CMAKE_CURRENT_BINARY_DIR}/include/kptools_linux.h
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/res/kptools-linux
     )
 
+    # Create dummy Android header for Linux build
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/include/kptools_android.h
+        COMMAND echo "// Dummy Android header for Linux build" > ${CMAKE_CURRENT_BINARY_DIR}/include/kptools_android.h
+        COMMAND echo "unsigned char kptools_android[] = {};" >> ${CMAKE_CURRENT_BINARY_DIR}/include/kptools_android.h
+        COMMAND echo "unsigned int kptools_android_len = 0;" >> ${CMAKE_CURRENT_BINARY_DIR}/include/kptools_android.h
+    )
 
-if(NOT ANDROID)
     add_custom_target(generate_headers ALL
         DEPENDS
             ${CMAKE_CURRENT_BINARY_DIR}/include/kpimg_enc.h
             ${CMAKE_CURRENT_BINARY_DIR}/include/kptools_linux.h
-    )
-else()
-    add_custom_target(generate_headers ALL
-        DEPENDS
-            ${CMAKE_CURRENT_BINARY_DIR}/include/kpimg_enc.h
             ${CMAKE_CURRENT_BINARY_DIR}/include/kptools_android.h
     )
-endif()
 
     # 编译主程序（主机版本）
     add_executable(patch main.cpp)
-    target_include_directories(patch PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
+    target_include_directories(patch PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     add_dependencies(patch generate_headers)
     target_link_libraries(patch PRIVATE -static)
 endif()
@@ -66,8 +64,7 @@ if(ANDROID)
     # 生成Android头文件
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/include/kptools_android.h
-        COMMAND xxd -i ${CMAKE_CURRENT_SOURCE_DIR}/res/kptools-android 
-                > ${CMAKE_CURRENT_BINARY_DIR}/include/kptools_android.h
+        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/res && xxd -i kptools-android > ${CMAKE_CURRENT_BINARY_DIR}/include/kptools_android.h
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/res/kptools-android
     )
 

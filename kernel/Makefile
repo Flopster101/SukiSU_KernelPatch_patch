@@ -1,5 +1,11 @@
 ifndef TARGET_COMPILE
-    TARGET_COMPILE=/root/.android/sdk/ndk/28.0.13004108/toolchains/llvm/prebuilt/linux-x86_64/bin
+    ifdef NDK_HOME
+        TARGET_COMPILE=$(NDK_HOME)/toolchains/llvm/prebuilt/linux-x86_64/bin
+    else ifdef ANDROID_NDK
+        TARGET_COMPILE=$(ANDROID_NDK)/toolchains/llvm/prebuilt/linux-x86_64/bin
+    else
+        TARGET_COMPILE=/root/.android/sdk/ndk/28.0.13004108/toolchains/llvm/prebuilt/linux-x86_64/bin
+    endif
 endif
 
 TARGET=kpimg

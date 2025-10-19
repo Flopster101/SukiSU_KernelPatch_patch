@@ -6,23 +6,42 @@ TOOLS=$(pwd)/tools
 PATCH=$(pwd)/patch
 KERNEL=$(pwd)/kernel
 
-export NDK_HOME=/root/.android/sdk/ndk/28.0.13004108
-# 构建 Android 版本
+# Auto-detect NDK path or use environment variable
+if [ -z "$NDK_HOME" ]; then
+    if [ -d "/opt/android-ndk" ]; then
+        export NDK_HOME="/opt/android-ndk"
+    elif [ -d "/root/.android/sdk/ndk/28.0.13004108" ]; then
+        export NDK_HOME="/root/.android/sdk/ndk/28.0.13004108"
+    fi
+fi
+
+if [ -z "$NDK_HOME" ] || [ ! -d "$NDK_HOME" ]; then
+    echo "Warning: Android NDK not found. Set NDK_HOME environment variable."
+    echo "Android build will be skipped."
+    BUILD_ANDROID=false
+else
+    BUILD_ANDROID=true
+fi
+# Build tools
 cd $TOOLS
 rm -rf build
-mkdir -p build/android
-cd build/android
-# 请替换以下变量为实际 NDK 路径或通过环境变量传递
-cmake \
-  -DCMAKE_TOOLCHAIN_FILE="$NDK_HOME/build/cmake/android.toolchain.cmake" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DANDROID_PLATFORM=android-33 \
-  -DANDROID_ABI=arm64-v8a ../..
-cmake --build .
-mv kptools kptools-android
+mkdir -p build
 
-# 构建 Linux 版本
-cd $TOOLS
+if [ "$BUILD_ANDROID" = true ]; then
+    # Build Android version
+    mkdir -p build/android
+    cd build/android
+    cmake \
+      -DCMAKE_TOOLCHAIN_FILE="$NDK_HOME/build/cmake/android.toolchain.cmake" \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DANDROID_PLATFORM=android-33 \
+      -DANDROID_ABI=arm64-v8a ../..
+    cmake --build .
+    mv kptools kptools-android
+    cd $TOOLS
+fi
+
+# Build Linux version
 cd build
 cmake ..
 make
@@ -35,41 +54,60 @@ make
 
 cd $HOME
 
-export ANDROID_NDK=/root/.android/sdk/ndk/28.0.13004108
+# Set ANDROID_NDK for patch build
+if [ "$BUILD_ANDROID" = true ]; then
+    export ANDROID_NDK="$NDK_HOME"
+fi
 
 rm -rf $PATCH/res/kpimg.enc
 rm -rf $PATCH/res/kpimg
 
-cp -r $TOOLS/build/android/kptools-android $PATCH/res
+if [ "$BUILD_ANDROID" = true ]; then
+    cp -r $TOOLS/build/android/kptools-android $PATCH/res
+fi
 cp -r $TOOLS/build/kptools-linux $PATCH/res
 cp -r $KERNEL/kpimg $PATCH/res
 
 cd $PATCH
 
 g++ -o encrypt encrypt.cpp -O3 -std=c++17
-chmod 777 ./encrypt
+chmod 755 ./encrypt
 ./encrypt res/kpimg res/kpimg.enc
-xxd -i res/kpimg.enc > include/kpimg_enc.h
-xxd -i res/kptools-linux > include/kptools_linux.h
-xxd -i res/kptools-android > include/kptools_android.h
 
-# 创建构建目录
-rm -rf build-android
-mkdir -p build-android
-cd build-android
+# Generate headers with clean variable names by running xxd from the res directory
+cd res
+xxd -i kpimg.enc > ../include/kpimg_enc.h
+xxd -i kptools-linux > ../include/kptools_linux.h
 
-# 生成编译配置
-cmake .. \
-    -DCMAKE_TOOLCHAIN_FILE=${ANDROID_NDK}/build/cmake/android.toolchain.cmake \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DANDROID_ABI=arm64-v8a \
-    -DANDROID_PLATFORM=android-33 \
-    -DANDROID_STL=c++_static
+if [ "$BUILD_ANDROID" = true ]; then
+    xxd -i kptools-android > ../include/kptools_android.h
 
-cmake --build .
-cp -r patch_android $HOME
+    cd $PATCH
+    # Build Android patch
+    rm -rf build-android
+    mkdir -p build-android
+    cd build-android
 
-cd $PATCH
+    cmake .. \
+        -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DANDROID_ABI=arm64-v8a \
+        -DANDROID_PLATFORM=android-33 \
+        -DANDROID_STL=c++_static
+
+    cmake --build .
+    cp -r patch_android $HOME
+    
+    cd $PATCH
+else
+    # Create dummy Android header for Linux-only build
+    cd $PATCH
+    echo "// Dummy Android header for Linux build" > include/kptools_android.h
+    echo "unsigned char kptools_android[] = {};" >> include/kptools_android.h
+    echo "unsigned int kptools_android_len = 0;" >> include/kptools_android.h
+fi
+
+# Build Linux patch
 rm -rf build-linux
 mkdir -p build-linux
 cd build-linux
